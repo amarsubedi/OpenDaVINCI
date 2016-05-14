@@ -127,6 +127,7 @@ SET(zlib_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/zlib-1.2.8")
 SET(libzip_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/libzip-0.9")
 SET(libwjwwoodserial_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/wjwwood-serial-1.2.1")
 SET(jpegcompressor_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/jpeg-compressor")
+SET(lodepng_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/lodepng")
 
 INCLUDE_DIRECTORIES (${zlib_SOURCE_DIR})
 SET (zlib-sources
@@ -252,6 +253,19 @@ IF(UNIX)
     SET_SOURCE_FILES_PROPERTIES(${jpegcompressor_SOURCE_DIR}/jpge.cpp PROPERTIES COMPILE_FLAGS "${JPEG_COMPILE_FLAGS}")
 ENDIF()
 
+INCLUDE_DIRECTORIES (${lodepng_SOURCE_DIR})
+SET (lodepng-headers
+    ${lodepng_SOURCE_DIR}/lodepng.h
+)
+SET (lodepng-sources
+    ${lodepng_SOURCE_DIR}/lodepng.cpp
+)
+# Set compile flags for lodepng sources.
+IF(UNIX)
+    SET(LODEPNG_COMPILE_FLAGS "-DLODEPNG_NO_COMPILE_DISK -Wno-effc++")
+    SET_SOURCE_FILES_PROPERTIES(${lodepng_SOURCE_DIR}/lodepng.cpp PROPERTIES COMPILE_FLAGS "${LODEPNG_COMPILE_FLAGS}")
+ENDIF()
+
 ###############################################################################
 # Set header files for coredata files generated from OpenDaVINCI.odvd.
 INCLUDE_DIRECTORIES(${COREDATA_DIR}/include)
@@ -296,7 +310,8 @@ ADD_LIBRARY (opendavinci-core OBJECT ${libopendavinci-sources}
                                      ${libwjwwoodserial-sources} 
                                      ${libzip-sources}
                                      ${zlib-sources}
-                                     ${jpegcompressor-sources})
+                                     ${jpegcompressor-sources}
+                                     ${lodepng-sources})
 ADD_LIBRARY (opendavinci-static STATIC $<TARGET_OBJECTS:opendavinci-core>)
 IF(    (NOT WIN32)
    AND (NOT ("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")) )

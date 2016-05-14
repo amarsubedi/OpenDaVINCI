@@ -230,12 +230,13 @@ message odcore.data.recorder.RecorderCommand [id = 11] {
 ///////////////////////////////////////////////////////////////////////////////
 // Shared BLOB messages.
 
-// This message describes
+// This message describes shared data.
 message odcore.data.SharedData [id = 13] {
     string name [id = 1, fourbyteid = 0x09823BC4];
     uint32 size [id = 2, fourbyteid = 0x0E435993];
 }
 
+// This message describes a shared image.
 message odcore.data.image.SharedImage extends odcore.data.SharedData [id = 14] {
     uint32 width [id = 1, fourbyteid = 0x0E43598A];
     uint32 height [id = 2, fourbyteid = 0x0E4359BD];
@@ -251,6 +252,16 @@ message odcore.data.image.SharedImage extends odcore.data.SharedData [id = 14] {
 //     uint16 compressedSize [id = 5];
 //     uint8 *imageData [id = 6]; // Dynamically sized arrays are not available yet.
 // }
+
+// This message describes a PNG compressed image.
+message odcore.data.image.PNGImage [id = 27] {
+    string name [id = 1];
+    uint32 size [id = 2];
+    uint32 width [id = 3];
+    uint32 height [id = 4];
+    uint8 bytesPerPixel [id = 5];
+    uint32 sizeInBytesForPNG [id = 6];
+}
 
 // This message can be used to provide meta-information about a
 // pointcloud stored in a shared memory segment.
