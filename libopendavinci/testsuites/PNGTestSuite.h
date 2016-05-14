@@ -29,6 +29,7 @@ using namespace std;
 class PNGTest : public CxxTest::TestSuite {
     public:
         void testCompressDecompress() {
+            // The following code snippet is based on a lodepng example program.
             unsigned width = 512, height = 512, bytesPerPixel = 3;
             unsigned char *image = new unsigned char[width * height * bytesPerPixel];
             for(unsigned y = 0; y < height; y++) {
@@ -46,6 +47,7 @@ class PNGTest : public CxxTest::TestSuite {
 
             TS_ASSERT(compressedData != NULL);
             TS_ASSERT(retCode == 0);
+            TS_ASSERT(destSize > 0);
 
             // Decompress data from PNG image.
             retCode = 0;

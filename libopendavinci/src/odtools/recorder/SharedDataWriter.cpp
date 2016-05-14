@@ -61,6 +61,8 @@ namespace odtools {
                     // Get meta data to be written as header.
                     Container header = ms.getHeader();
 
+// TODO: If PNG compression enabled && header.getDataType == SharedImage::ID --> compress ptrToMemory into PNG and replace SharedImage with PNGImage
+
                     // Get pointer to memory with the data.
                     char *ptrToMemory = m_mapOfMemories[ms.getIdentifier()];
 

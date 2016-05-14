@@ -295,6 +295,8 @@ namespace odtools {
                 // Get pointer to memory where to store the data.
                 char *ptrToMemory = m_mapOfMemories[ms.getIdentifier()];
 
+// TODO: If PNG decompression enabled && header.getDataType == PNGImage::ID --> read PNGImage meta information, read data from file, decompress data to memory, repace PNGImage with SharedImage.
+
                 // Seek to the current position in the stream.
                 m_inSharedMemoryFile->seekg(curr);
 
