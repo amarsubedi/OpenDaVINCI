@@ -387,6 +387,7 @@ namespace odtools {
                     m_bufferOut.enter(c);
                 }
                 else {
+cerr << "Failed to decode" << endl;
                     // Something failed, recycle memory.
                     m_bufferIn.enter(c);
                 }

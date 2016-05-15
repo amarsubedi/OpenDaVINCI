@@ -141,6 +141,10 @@ namespace odtools {
                                     // Copy compressed PNG data into MemorySegment data structure.
                                     ::memcpy(destPtr, compressedData, sizeOfCompressedImage);
 
+                uint32_t size = si.getSize();
+                size = (size > 0) ? size : (si.getWidth() * si.getHeight() * si.getBytesPerPixel());
+                si.setSize(size);
+
                                     // Create replacement data structure for SharedImage.
                                     odcore::data::image::SharedImagePNG siPNG(si.getName(),
                                                                               si.getSize(),
@@ -188,6 +192,7 @@ namespace odtools {
                     m_bufferOut.enter(c);
                 }
                 else {
+cerr << "Failed to encode." << endl;
                     // Copying data failed, recycle this buffer entry.
                     m_bufferIn.enter(c);
                 }

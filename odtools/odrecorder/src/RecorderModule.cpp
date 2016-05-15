@@ -62,9 +62,15 @@ namespace odrecorder {
         const bool THREADING = true;
         // Dump shared images and shared data?
         const bool DUMP_SHARED_DATA = getKeyValueConfiguration().getValue<uint32_t>("odrecorder.dumpshareddata") == 1;
+        // Convert shared images as PNG?
+        bool dumpSharedImagesAsPNG = false;
+        try {
+            dumpSharedImagesAsPNG = getKeyValueConfiguration().getValue<uint32_t>("odrecorder.usePNG") == 1;
+        }
+        catch(...) {}
 
         // Actual "recording" interface.
-        Recorder r(recorderOutputURL, MEMORY_SEGMENT_SIZE, NUMBER_OF_SEGMENTS, THREADING, DUMP_SHARED_DATA);
+        Recorder r(recorderOutputURL, MEMORY_SEGMENT_SIZE, NUMBER_OF_SEGMENTS, THREADING, DUMP_SHARED_DATA, dumpSharedImagesAsPNG);
 
         // Connect recorder's FIFOQueue to record all containers except for shared images/shared data.
         addDataStoreFor(r.getFIFO());
