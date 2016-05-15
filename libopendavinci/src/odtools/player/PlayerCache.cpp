@@ -27,13 +27,15 @@
 #include "opendavinci/odcore/base/Thread.h"
 #include "opendavinci/odcore/data/TimeStamp.h"
 #include "opendavinci/odcore/opendavinci.h"
+#include "opendavinci/odcore/wrapper/png/PNG.h"
 #include "opendavinci/odcore/wrapper/SharedMemory.h"
 #include "opendavinci/odcore/wrapper/SharedMemoryFactory.h"
+#include "opendavinci/odtools/player/PlayerCache.h"
 #include "opendavinci/generated/odcore/data/SharedData.h"
 #include "opendavinci/generated/odcore/data/buffer/MemorySegment.h"
 #include "opendavinci/generated/odcore/data/image/SharedImage.h"
+#include "opendavinci/generated/odcore/data/image/SharedImagePNG.h"
 #include "opendavinci/generated/odcore/data/SharedPointCloud.h"
-#include "opendavinci/odtools/player/PlayerCache.h"
 
 namespace odtools {
     namespace player {
@@ -250,6 +252,10 @@ namespace odtools {
                 string nameOfSharedMemory = "";
                 uint32_t size = 0;
 
+                // This instance is only used if we encounter a PNG compressed image.
+                odcore::data::image::SharedImagePNG siPNG;
+
+                // Do we need to handle uncompressed shared images?
                 if (header.getDataType() == odcore::data::image::SharedImage::ID()) {
                     odcore::data::image::SharedImage si = header.getData<odcore::data::image::SharedImage>();
 
@@ -274,8 +280,14 @@ namespace odtools {
                     nameOfSharedMemory = spc.getName();
                     size = spc.getSize();
                 }
+                else if (header.getDataType() == odcore::data::image::SharedImagePNG::ID()) {
+                    siPNG = header.getData<odcore::data::image::SharedImagePNG>();
 
-                // Check, whether a shared memory was already created for this SharedImage or SharedData; otherwise, create it and save it for later.
+                    nameOfSharedMemory = siPNG.getName();
+                    size = siPNG.getSize();
+                }
+
+                // Check, whether a shared memory was already created for this SharedX; otherwise, create it and save it for later.
                 map<string, std::shared_ptr<odcore::wrapper::SharedMemory> >::iterator it = m_sharedPointers.find(nameOfSharedMemory);
                 if (it == m_sharedPointers.end()) {
                     std::shared_ptr<odcore::wrapper::SharedMemory> sp = odcore::wrapper::SharedMemoryFactory::createSharedMemory(nameOfSharedMemory, size);
@@ -289,28 +301,96 @@ namespace odtools {
                 Container c = m_bufferIn.leave();
                 odcore::data::buffer::MemorySegment ms = c.getData<odcore::data::buffer::MemorySegment>();
 
-                // Store meta data.
-                ms.setHeader(header);
-
                 // Get pointer to memory where to store the data.
                 char *ptrToMemory = m_mapOfMemories[ms.getIdentifier()];
 
-// TODO: If PNG decompression enabled && header.getDataType == PNGImage::ID --> read PNGImage meta information, read data from file, decompress data to memory, repace PNGImage with SharedImage.
+                // Flag to indicate whether copying of the data succeeded.
+                bool copied = false;
 
-                // Seek to the current position in the stream.
-                m_inSharedMemoryFile->seekg(curr);
+                // Check if we need to handle a PNG compressed image that needs to be replaced by a regular SharedImage.
+                if (header.getDataType() == odcore::data::image::SharedImagePNG::ID()) {
+                    const uint32_t SIZE_OF_COMPRESSED_DATA = siPNG.getSizeInBytesForPNG();
 
-                // Read the data into the buffer.
-                m_inSharedMemoryFile->read(ptrToMemory, size);
+                    // Check if we have enough space to hold the data before continuing.
+                    if (SIZE_OF_COMPRESSED_DATA <= ms.getSize()) {
+                        // Seek to the current position in the stream.
+                        m_inSharedMemoryFile->seekg(curr);
 
-                // Store the consumed size of the MemorySegment.
-                ms.setConsumedSize(size);
+                        // Read the data into the buffer (due to performance, we simple use the pre-allocated memory twice).
+                        m_inSharedMemoryFile->read(ptrToMemory, SIZE_OF_COMPRESSED_DATA);
 
-                // Save meta information.
-                c = Container(ms);
+                        // Decompress PNG data (will create a fresh buffer).
+                        uint8_t returnCode = 0;
+                        uint32_t decompressedWidth = 0;
+                        uint32_t decompressedHeight = 0;
+                        uint8_t actualBytesPerPixel = 0;
+                        unsigned char *decompressedData = odcore::wrapper::png::PNG::decompress(reinterpret_cast<unsigned char*>(ptrToMemory), SIZE_OF_COMPRESSED_DATA, &decompressedWidth, &decompressedHeight, &actualBytesPerPixel, siPNG.getBytesPerPixel(), returnCode);
 
-                // Put the processed element into the output buffer.
-                m_bufferOut.enter(c);
+                        // Check if decompression succeeded.
+                        if ( (0 == returnCode) &&
+                             (siPNG.getWidth() == decompressedWidth) &&
+                             (siPNG.getHeight() == decompressedHeight) &&
+                             (siPNG.getBytesPerPixel() == actualBytesPerPixel) &&
+                             (NULL != decompressedData) ) {
+                            // Create replacement data structure for SharedImagePNG.
+                            odcore::data::image::SharedImage si;
+                                si.setName(siPNG.getName());
+                                si.setSize(siPNG.getSize());
+                                si.setWidth(siPNG.getWidth());
+                                si.setHeight(siPNG.getHeight());
+                                si.setBytesPerPixel(siPNG.getBytesPerPixel());
+
+                            if (si.getSize() <= ms.getSize()) {
+                                // Copy data from decompressed image into MemorySegment data structure.
+                                ::memcpy(ptrToMemory, decompressedData, si.getSize());
+
+                                // Store meta data.
+                                ms.setHeader(si);
+
+                                // Store the consumed size of the MemorySegment.
+                                ms.setConsumedSize(si.getSize());
+
+                                // Save meta information.
+                                c = Container(ms);
+
+                                copied = true;
+                            }
+                        }
+
+                        // Release memory acquired during the decompressing phase.
+                        if (NULL != decompressedData) {
+                            ::free(decompressedData);
+                        }
+                    }
+                }
+                else {
+                    // Seek to the current position in the stream.
+                    m_inSharedMemoryFile->seekg(curr);
+
+                    // Read the data into the buffer.
+                    m_inSharedMemoryFile->read(ptrToMemory, size);
+
+                    // Store meta data.
+                    ms.setHeader(header);
+
+                    // Store the consumed size of the MemorySegment.
+                    ms.setConsumedSize(size);
+
+                    // Save meta information.
+                    c = Container(ms);
+
+                    copied = true;
+                }
+
+                if (copied) {
+                    // Put the processed element into the output buffer.
+                    m_bufferOut.enter(c);
+                }
+                else {
+                    // Something failed, recycle memory.
+                    m_bufferIn.enter(c);
+                }
+
             }
         }
 

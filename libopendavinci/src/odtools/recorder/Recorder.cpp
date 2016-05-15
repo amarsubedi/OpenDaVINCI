@@ -37,7 +37,10 @@ namespace odtools {
         using namespace odcore::data;
         using namespace odcore::io;
 
-        Recorder::Recorder(const string &url, const uint32_t &memorySegmentSize, const uint32_t &numberOfSegments, const bool &threading, const bool &dumpSharedData) :
+        // Delegate to other constructor.
+        Recorder::Recorder(const string &url, const uint32_t &memorySegmentSize, const uint32_t &numberOfSegments, const bool &threading, const bool &dumpSharedData) : Recorder(url, memorySegmentSize, numberOfSegments, threading, dumpSharedData, false) {}
+
+        Recorder::Recorder(const string &url, const uint32_t &memorySegmentSize, const uint32_t &numberOfSegments, const bool &threading, const bool &dumpSharedData, const bool &dumpSharedImageAsPNG) :
             m_fifo(),
             m_sharedDataListener(),
             m_out(NULL),
@@ -53,7 +56,7 @@ namespace odtools {
             m_outSharedMemoryFile = StreamFactory::getInstance().getOutputStream(urlSharedMemoryFile);
 
             // Create data store for shared memory.
-            m_sharedDataListener = unique_ptr<SharedDataListener>(new SharedDataListener(m_outSharedMemoryFile, memorySegmentSize, numberOfSegments, threading));
+            m_sharedDataListener = unique_ptr<SharedDataListener>(new SharedDataListener(m_outSharedMemoryFile, memorySegmentSize, numberOfSegments, threading, dumpSharedImageAsPNG));
         }
 
         Recorder::~Recorder() {

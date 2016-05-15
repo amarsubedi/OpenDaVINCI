@@ -254,7 +254,7 @@ message odcore.data.image.SharedImage extends odcore.data.SharedData [id = 14] {
 // }
 
 // This message describes a PNG compressed image.
-message odcore.data.image.PNGImage [id = 27] {
+message odcore.data.image.SharedImagePNG [id = 27] {
     string name [id = 1];
     uint32 size [id = 2];
     uint32 width [id = 3];

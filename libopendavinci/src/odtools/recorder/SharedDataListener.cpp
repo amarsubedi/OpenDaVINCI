@@ -28,9 +28,11 @@
 #include "opendavinci/odcore/opendavinci.h"
 #include "opendavinci/odcore/wrapper/SharedMemory.h"
 #include "opendavinci/odcore/wrapper/SharedMemoryFactory.h"
-#include "opendavinci/generated/odcore/data/buffer/MemorySegment.h"
+#include "opendavinci/odcore/wrapper/png/PNG.h"
 #include "opendavinci/odtools/recorder/SharedDataListener.h"
 #include "opendavinci/odtools/recorder/SharedDataWriter.h"
+#include "opendavinci/generated/odcore/data/buffer/MemorySegment.h"
+#include "opendavinci/generated/odcore/data/image/SharedImagePNG.h"
 
 namespace odtools {
     namespace recorder {
@@ -40,8 +42,9 @@ namespace odtools {
         using namespace odcore::data;
         using namespace odtools;
 
-        SharedDataListener::SharedDataListener(std::shared_ptr<ostream> out, const uint32_t &memorySegmentSize, const uint32_t &numberOfMemorySegments, const bool &threading) :
+        SharedDataListener::SharedDataListener(std::shared_ptr<ostream> out, const uint32_t &memorySegmentSize, const uint32_t &numberOfMemorySegments, const bool &threading, const bool &dumpSharedImageAsPNG) :
             m_threading(threading),
+            m_dumpSharedImageAsPNG(dumpSharedImageAsPNG),
             m_sharedDataWriter(),
             m_mapOfAvailableSharedData(),
             m_mapOfAvailableSharedImages(),
@@ -97,7 +100,7 @@ namespace odtools {
             CLOG1 << "done." << endl;
         }
 
-        bool SharedDataListener::copySharedMemoryToMemorySegment(const string &name, const Container &header) {
+        bool SharedDataListener::copySharedMemoryToMemorySegment(const string &name, Container &header) {
             bool copied = false;
 
             // Check if m_bufferIn has some capacity left to store the new image.
@@ -118,17 +121,64 @@ namespace odtools {
                             // Get pointer to shared memory segment.
                             char *src = static_cast<char*>(memory->getSharedMemory());
 
-                            // Copy data from shared memory segment into MemorySegment data structure.
-                            ::memcpy(destPtr, src, memory->getSize());
+                            // Check if the current container (provided in header) is of SharedImage
+                            // and if it needs to be replaced by a PNG compressed image.
+                            if ( (m_dumpSharedImageAsPNG) &&
+                                 (header.getDataType() == odcore::data::image::SharedImage::ID()) ) {
+                                // Retrieve current SharedImage.
+                                odcore::data::image::SharedImage si = header.getData<odcore::data::image::SharedImage>();
 
-                            // Store meta information.
-                            ms.setHeader(header);
-                            ms.setConsumedSize(memory->getSize());
+                                // Compress existing shared image as PNG image (please note that
+                                // the call to PNG compressor will consume new memory).
+                                uint32_t sizeOfCompressedImage = 0;
+                                uint8_t returnCode = 0;
+                                unsigned char *compressedData = odcore::wrapper::png::PNG::compress(reinterpret_cast<unsigned char*>(src), si.getWidth(), si.getHeight(), si.getBytesPerPixel(), sizeOfCompressedImage, returnCode);
 
-                            // Save meta information.
-                            c = Container(ms);
+                                if ( (0 == returnCode) &&
+                                     (0 < sizeOfCompressedImage) &&
+                                     (sizeOfCompressedImage <= memory->getSize()) &&
+                                     (NULL != compressedData) ) {
+                                    // Copy compressed PNG data into MemorySegment data structure.
+                                    ::memcpy(destPtr, compressedData, sizeOfCompressedImage);
 
-                            copied = true;
+                                    // Create replacement data structure for SharedImage.
+                                    odcore::data::image::SharedImagePNG siPNG(si.getName(),
+                                                                              si.getSize(),
+                                                                              si.getWidth(),
+                                                                              si.getHeight(),
+                                                                              si.getBytesPerPixel(),
+                                                                              sizeOfCompressedImage);
+
+                                    // Store meta information.
+                                    ms.setHeader(siPNG);
+                                    ms.setConsumedSize(sizeOfCompressedImage);
+
+                                    // Save meta information.
+                                    c = Container(ms);
+
+                                    copied = true;
+                                }
+
+                                // Release memory acquired during the compressing phase.
+                                if (compressedData != NULL) {
+                                    ::free(compressedData);
+                                }
+                            }
+                            else {
+                                // Dump data as it is.
+
+                                // Copy data from shared memory segment into MemorySegment data structure.
+                                ::memcpy(destPtr, src, memory->getSize());
+
+                                // Store meta information.
+                                ms.setHeader(header);
+                                ms.setConsumedSize(memory->getSize());
+
+                                // Save meta information.
+                                c = Container(ms);
+
+                                copied = true;
+                            }
                         }
                     }
                 }
@@ -136,6 +186,10 @@ namespace odtools {
                 if (copied) {
                     // Enter memory segment to processing queue.
                     m_bufferOut.enter(c);
+                }
+                else {
+                    // Copying data failed, recycle this buffer entry.
+                    m_bufferIn.enter(c);
                 }
             }
 
@@ -162,7 +216,7 @@ namespace odtools {
 
                     CLOG1 << "done." << endl;
                 }
-                hasCopied = copySharedMemoryToMemorySegment(sd.getName(), container);
+                hasCopied = copySharedMemoryToMemorySegment(sd.getName(), const_cast<Container&>(container));
             }
 
             // Shared Point Cloud.
@@ -182,7 +236,7 @@ namespace odtools {
 
                     CLOG1 << "done." << endl;
                 }
-                hasCopied = copySharedMemoryToMemorySegment(spc.getName(), container);
+                hasCopied = copySharedMemoryToMemorySegment(spc.getName(), const_cast<Container&>(container));
             }
 
             // Shared Images.

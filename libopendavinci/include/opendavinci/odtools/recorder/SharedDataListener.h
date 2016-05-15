@@ -74,8 +74,9 @@ class SharedDataWriter;
                  * @param memorySegmentSize Size of one memory segment.
                  * @param numberOfMemorySegments Number of available memory segments.
                  * @param threading Cf. constructor of Recorder.
+                 * @param dumpSharedImageAsPNG If true, shared images will be saved using PNG compression.
                  */
-                SharedDataListener(std::shared_ptr<ostream> out, const uint32_t &memorySegmentSize, const uint32_t &numberOfMemorySegments, const bool &threading);
+                SharedDataListener(std::shared_ptr<ostream> out, const uint32_t &memorySegmentSize, const uint32_t &numberOfMemorySegments, const bool &threading, const bool &dumpSharedImageAsPNG);
 
                 virtual ~SharedDataListener();
 
@@ -96,10 +97,12 @@ class SharedDataWriter;
                  * @param header Container that contains the meta-data for this shared memory segment which shall be used as header in the file.
                  * @return true if the copy succeeded.
                  */
-                bool copySharedMemoryToMemorySegment(const string &name, const odcore::data::Container &header);
+                bool copySharedMemoryToMemorySegment(const string &name, odcore::data::Container &header);
 
             private:
                 bool m_threading;
+                bool m_dumpSharedImageAsPNG;
+
                 unique_ptr<SharedDataWriter> m_sharedDataWriter;
                 map<string, odcore::data::SharedData> m_mapOfAvailableSharedData;
                 map<string, odcore::data::image::SharedImage> m_mapOfAvailableSharedImages;
