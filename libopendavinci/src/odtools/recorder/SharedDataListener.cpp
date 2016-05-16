@@ -132,7 +132,11 @@ namespace odtools {
                                 // the call to PNG compressor will consume new memory).
                                 uint32_t sizeOfCompressedImage = 0;
                                 uint8_t returnCode = 0;
-                                unsigned char *compressedData = odcore::wrapper::png::PNG::compress(reinterpret_cast<unsigned char*>(src), si.getWidth(), si.getHeight(), si.getBytesPerPixel(), sizeOfCompressedImage, returnCode);
+                                unsigned char *compressedData = odcore::wrapper::png::PNG::compress((unsigned char*)(src), si.getWidth(), si.getHeight(), si.getBytesPerPixel(), sizeOfCompressedImage, returnCode);
+
+for (int ii = 0; ii < 20; ii++) {
+    cerr << (int)compressedData[ii] << " ";
+} cerr << endl;
 
                                 if ( (0 == returnCode) &&
                                      (0 < sizeOfCompressedImage) &&
@@ -141,9 +145,12 @@ namespace odtools {
                                     // Copy compressed PNG data into MemorySegment data structure.
                                     ::memcpy(destPtr, compressedData, sizeOfCompressedImage);
 
-                uint32_t size = si.getSize();
-                size = (size > 0) ? size : (si.getWidth() * si.getHeight() * si.getBytesPerPixel());
-                si.setSize(size);
+                                    // Fix size flag in SharedImage.
+                                    {
+                                        uint32_t size = si.getSize();
+                                        size = (size > 0) ? size : (si.getWidth() * si.getHeight() * si.getBytesPerPixel());
+                                        si.setSize(size);
+                                    }
 
                                     // Create replacement data structure for SharedImage.
                                     odcore::data::image::SharedImagePNG siPNG(si.getName(),
@@ -153,8 +160,13 @@ namespace odtools {
                                                                               si.getBytesPerPixel(),
                                                                               sizeOfCompressedImage);
 
+                                    // Wrap siPNG into a container for dumping to disk.
+                                    Container containerForsiPNG(siPNG);
+                                    containerForsiPNG.setReceivedTimeStamp(header.getReceivedTimeStamp());
+                                    containerForsiPNG.setSentTimeStamp(header.getSentTimeStamp());
+cout << siPNG.toString() << endl;
                                     // Store meta information.
-                                    ms.setHeader(siPNG);
+                                    ms.setHeader(containerForsiPNG);
                                     ms.setConsumedSize(sizeOfCompressedImage);
 
                                     // Save meta information.
